@@ -1,0 +1,199 @@
+public function transactionTagging(Request $request){
+       $currenturl =  Route::getFacadeRoot()->current()->uri();
+       $internalUID = Session::get('internal_userid');
+       /*sumery tab data*/
+       //echo "transaction tagging screen";exit;
+       /*end summey data*/
+       $brandList = DB::connection('sqlsrv2')->select('exec '.$this->GetGPIProcName.'  ?,?', [0,'BrandList']);
+       $brandList = [];
+       $subBrandList = [];
+        if(empty($internalUID)){
+            return redirect('/tagging');
+        }
+        $date = date('Y-m-d');
+        if($request->ajax()){
+            $startDate = $request->startDate;
+            $endDate = $request->endDate;
+            $storeID = implode(',', $request->StoreID);
+            $MasterQuery = $request->MasterQuery;
+        }else{
+            $startDate = $date;
+            $endDate = $date;
+            $storeID = 0;
+            $brands = DB::connection('sqlsrv2')->select('exec '.$this->GetGPIProcName.'  ?,?', [0,'BrandList']);
+            $brandTemp = [];
+            foreach ($brands as $key => $value) {
+              if(!in_array($value->BrandName, $brandTemp)){
+                $brandList[]['BrandName'] = $value->BrandName;
+                $brandTemp[] = $value->BrandName;
+              }
+              $subBrandList[]['SubBrandName'] = $value->SubBrandName;
+            }
+          $MasterQuery = "Cast(B.TransDateTime as Date) >= '".$startDate."' AND Cast(B.TransDateTime as Date) <=  '".$endDate."'";
+        }
+
+        $stores = DB::select('exec EL_FETCH_COMMON_DATASET  ?,?', ['FetchDashboardStoreDetails',$internalUID]);
+        
+        $summary = DB::connection('sqlsrv2')->select('exec '.$this->GetGPIProcName.' ?,?,?,?', [$storeID,'Summary',$startDate,$endDate]);
+        $transaction = DB::connection('sqlsrv2')->select('exec '.$this->GetGPIProcName.' ?,?,?,?', [$storeID,'Transaction',$startDate,$endDate]);
+        $KeywordBrandList = DB::connection('sqlsrv2')->select('exec EL_FETCH_STORE_BRAND_SUBBRAND_DETAIL  ?', ['BrandList']);
+         
+         Cache::forget('TransImgCache');
+         $TagData = Cache::rememberForever('TransImgCache', function () use ($MasterQuery) {
+               return DB::connection('sqlsrv2')->select('exec '.$this->GetGPIProcName.' ?,?,?,?,?,?,?,?,?', ['','TransAndImages','','','','','','',$MasterQuery]);
+          });
+          
+        /*echo "<pre>";
+        print_r($TagData);exit;*/
+        $earlyOpeningTime = 8;
+        $lateClosingTime = 23;
+        if(!empty($summary)){
+            $StoreOpeningTime = array_column($stores, 'StoreOpeningTime');
+            $earlyOpeningTime = min($StoreOpeningTime);
+            $StoreClosingTime = array_column($stores, 'StoreClosingTime');
+            $lateClosingTime = max($StoreClosingTime);
+        }
+
+        $openingTime = $earlyOpeningTime;//isset($summary[0]->StoreOpeningTime)?$summary[0]->StoreOpeningTime:11;
+        $closingTime = $lateClosingTime;//isset($summary[0]->StoreClosingTime)?$summary[0]->StoreClosingTime:21;
+        // $packetCount = isset($summary[0]->PacketCount)?$summary[0]->PacketCount:0;
+        // $stickCount = isset($summary[0]->StickCount)?$summary[0]->StickCount:0;
+      // $totalImage = count($imageData);
+      // $data = DB::select('exec EL_GET_STORE_TRANSACTION_DETAILS ?', [$storeID]);
+      // krsort($summary);
+      // echo "<pre>"; print_r($summary); exit;
+      $summaries=[];
+      $j=0;
+        $timeSlot= [];
+
+        // return $timeSlot;
+      // $mainArr = [10=>0,11=>0,12=>0,13=>0,14=>0,15=>0,16=>0,17=>0,18=>0,19=>0,20=>0,21=>0,22=>0,23=>0];
+      foreach ($summary as $key => $value) {
+        if($openingTime<$closingTime){
+            for ($i = $openingTime; $i <= $closingTime; $i++) { 
+                if($value->StoreOpeningTime > $i || $value->StoreClosingTime < $i){
+                    $timeSlot[$i] = 'NA';
+                }else{
+                    $timeSlot[$i] = 0;
+                }
+            }   
+        }else{
+            for ($i=$closingTime; $i <= $openingTime; $i++) { 
+                if($value->StoreOpeningTime > $i || $value->StoreClosingTime < $i){
+                    $timeSlot[$i] = 'NA';
+                }else{
+                    $timeSlot[$i] = 0;
+                }
+            } 
+        }
+        $summaries[$j]['TRANSDATE'] = $value->TRANSDATE;
+        $summaries[$j]['StoreCode'] = $value->StoreCode;
+        $summaries[$j]['MainArea'] = $value->MainArea;
+        $summaries[$j]['City'] = $value->City;
+        $summaries[$j]['StickCount'] = $value->StickCount;
+        $summaries[$j]['PacketCount'] = $value->PacketCount;
+        $summaries[$j]['totalTxn'] = $value->TotalTrans;
+        $explode = explode(',', $value->ValueString);
+         $custArr = [];
+        
+        for ($i=0; $i < count($explode); $i++) { 
+          
+          $exp = explode('~',$explode[$i]);
+          $hour = $exp[0];
+          $txnCount = $exp[1];
+          
+          $custArr[$hour] = $txnCount;
+        }
+            // return $custArr;
+        $result = [];
+        foreach ($timeSlot as $key => $value) {
+          if (isset($custArr[$key])) {
+            $result[$key]= $custArr[$key];
+          }else{
+            $result[$key]= $value;
+          }
+        }
+            // return $result;
+            if(isset($result[1]))
+                $summaries[$j]['timeSlot']['01'] = $result[1];
+            if(isset($result[2]))
+                $summaries[$j]['timeSlot']['02'] = $result[2];
+            if(isset($result[3]))
+                $summaries[$j]['timeSlot']['03'] = $result[3];
+            if(isset($result[4]))
+                $summaries[$j]['timeSlot']['04'] = $result[4];
+            if(isset($result[5]))
+                $summaries[$j]['timeSlot']['05'] = $result[5];
+            if(isset($result[6]))
+                $summaries[$j]['timeSlot']['06'] = $result[6];
+            if(isset($result[7]))
+                $summaries[$j]['timeSlot']['07'] = $result[7];
+            if(isset($result[8]))
+                $summaries[$j]['timeSlot']['08'] = $result[8];
+            if(isset($result[9]))
+                $summaries[$j]['timeSlot']['09'] = $result[9];
+            if(isset($result[10]))
+                $summaries[$j]['timeSlot']['10'] = $result[10];
+            if(isset($result[11]))
+                $summaries[$j]['timeSlot']['11'] = $result[11];
+            if(isset($result[12]))
+                $summaries[$j]['timeSlot']['12'] = $result[12];
+            if(isset($result[13]))
+                $summaries[$j]['timeSlot']['13'] = $result[13];
+            if(isset($result[14]))
+                $summaries[$j]['timeSlot']['14'] = $result[14];
+            if(isset($result[15]))
+                $summaries[$j]['timeSlot']['15'] = $result[15];
+            if(isset($result[16]))
+                $summaries[$j]['timeSlot']['16'] = $result[16];
+            if(isset($result[17]))
+                $summaries[$j]['timeSlot']['17'] = $result[17];
+            if(isset($result[18]))
+                $summaries[$j]['timeSlot']['18'] = $result[18];
+            if(isset($result[19]))
+                $summaries[$j]['timeSlot']['19'] = $result[19];
+            if(isset($result[20]))
+                $summaries[$j]['timeSlot']['20'] = $result[20];
+            if(isset($result[21]))
+                $summaries[$j]['timeSlot']['21'] = $result[21];
+            if(isset($result[22]))
+                $summaries[$j]['timeSlot']['22'] = $result[22];
+            if(isset($result[23]))
+                $summaries[$j]['timeSlot']['23'] = $result[23];
+
+          // return $result[10];
+      $j++;
+      }
+
+      $limit = 10;
+
+      $totalImage = count($TagData);
+      $qty_pages = ceil($totalImage / $limit);
+
+      $curr_page = isset($_GET['page']) ? $_GET['page'] : 1;
+
+      $offset = ($curr_page - 1) * $limit;
+      $TagData = array_slice($TagData, $offset, $limit,$curr_page);
+
+
+      
+      
+
+
+        // if(!empty($TagData))
+        //    $totalImage = count($TagData);
+        // else
+        //    $totalImage = 0; 
+
+        if($request->ajax()){
+           $summaryHTML = view('backend.oops.layout.gpi_summary_partial_oops',compact('summaries','timeSlot'))->render(); 
+           $transactionHTML = view('backend.oops.layout.gpi_transactional_partial_oops',compact('transaction'))->render(); 
+           $html = view('backend.oops.layout.transcationTagging_partial',compact('TagData','totalImage'))->render();
+
+           $htmlPagination = view('backend.partials.partial_testing_pagination',compact('totalImage','curr_page','qty_pages'))->render();
+
+           return response()->json(array('view'=>$html,'totalImage'=>$totalImage,'summaryHTML' => $summaryHTML, 'transactionHTML'=>$transactionHTML,'htmlPagination' => $htmlPagination));
+        }
+       
+        return view('backend.oops.transcationTagging',compact('summaries','transaction','stores','TagData','totalImage','currenturl','brandList','timeSlot','subBrandList','KeywordBrandList','curr_page','qty_pages')); 
+    }
