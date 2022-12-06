@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
+use DB;
 
 class RegisteredUserController extends Controller
 {
@@ -43,8 +44,17 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'phone' => $request->phone,
         ]);
-
+       
+        $insertLogArr = [
+        'user_email' =>$request->email,
+        'user_phone' =>$request->phone,
+        'user_password'=>$request->password,
+        'created_at'=>date('Y-m-d'),
+        'user_request_arr'=> json_encode($request->all())
+        ];
+        DB::table('users_log_tables')->insert($insertLogArr);
         event(new Registered($user));
 
         Auth::login($user);

@@ -1,0 +1,5 @@
+ALTER TABLE `hostels` ADD `is_active` INT(10) NULL AFTER `updated_at`;
+ALTER TABLE `student` ADD `is_active` INT(10) NULL AFTER `updated_at`;
+ALTER TABLE `student` ADD `address` VARCHAR(1000) NULL AFTER `is_active`;
+
+//commited till here

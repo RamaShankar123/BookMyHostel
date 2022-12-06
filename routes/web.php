@@ -22,6 +22,14 @@ Route::get('enquiry', [HomeController::class,'enqueryForm']);
 Route::post('submit-inquery-form', [HomeController::class,'submitInqueryForm']);
 Route::get('success', [HomeController::class,'success']);
 Route::get('get-hostel-enqueries-for-oops-team', [HostelEnqueries::class,'getEnqueries']);
+Route::get('get-distance', [HomeController::class,'getDistanceOfTwoLocation']);
+Route::get('calculate-audio-duration', [HomeController::class,'audioLength']);
+Route::get('add-user', [HomeController::class,'adduser']);
+Route::post('save-add-user', [HomeController::class,'saveAdduser']);
+Route::get('user-list', [HomeController::class,'getUser']);
+Route::get('edit-user', [HomeController::class,'editUser']);
+Route::get('delete-user', [HomeController::class,'deleteUser']);
+Route::post('update-user', [HomeController::class,'updateUser']);
 
 Route::get('/dashboard', function () {
     return view('dashboard');

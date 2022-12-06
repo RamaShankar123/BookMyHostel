@@ -1,8 +1,11 @@
 @extends('layout.app')
 @section('content')
 <div class="container">
+    <div class="row">
+        <h3>Add Hostel</h3>
+    </div>
     <form method="post" action="{{url('/save-admin-hostel')}}" enctype="multipart/form-data">
-  <div class="row justify-content-md-center">
+  <div class="row justify-content-md-center" style="background-color: white;padding: 2%;border-radius: 1%;">
       @if($errors->any())
        <div class="alert alert-warning" role="alert">
        {{$errors->first()}}
